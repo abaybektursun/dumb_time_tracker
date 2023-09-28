@@ -1,8 +1,10 @@
+from pathlib import Path
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton,
     QLabel, QLineEdit, QFormLayout, QCalendarWidget,
     QTableWidget, QTableWidgetItem, QMainWindow,
+    QStyleFactory,
     QHBoxLayout, QHeaderView
 )
 from PyQt6.QtCore import Qt, QDate, QTimer
@@ -37,8 +39,27 @@ class TimeTracker(QWidget):
     def init_ui(self):
         self.setWindowTitle('Time Tracker')
 
+        # Use Fusion style to get a more modern and flat appearance
+        self.setStyle(QStyleFactory.create('Fusion'))
+
+		# Set a light palette for a MacOS/iOS-like look
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(240, 240, 240))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(50, 50, 50))
+        palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(245, 245, 245))
+        palette.setColor(QPalette.ColorRole.Text, QColor(50, 50, 50))
+        palette.setColor(QPalette.ColorRole.Highlight, QColor(60, 140, 220))
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+        self.setPalette(palette)
+
+        # Create a layout with consistent margins and spacing
         self.layout = QVBoxLayout(self)
-        self.layout.setSpacing(20)
+        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setSpacing(10)
+
+        #self.layout = QVBoxLayout(self)
+        #self.layout.setSpacing(20)
 
         self.form_layout = QFormLayout()
         self.project_input = QLineEdit()
@@ -54,6 +75,31 @@ class TimeTracker(QWidget):
         self.button_layout.addWidget(self.start_button)
         self.button_layout.addWidget(self.stop_button)
         self.button_layout.addWidget(self.show_button)
+
+        # Style the buttons to be flat with rounded corners
+        button_style = """
+        QPushButton {
+            font-size: 14px;
+            color: #fff;
+            background-color: #3498db;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            outline: none;
+        }
+        QPushButton:disabled {
+            background-color: #bbb;
+        }
+        QPushButton:hover {
+            background-color: #2980b9;
+        }
+        QPushButton:pressed {
+            background-color: #1c598f;
+        }
+        """
+        self.start_button.setStyleSheet(button_style)
+        self.stop_button.setStyleSheet(button_style)
+        self.show_button.setStyleSheet(button_style)
 
         self.time_label = QLabel('Current Project Time: 0 seconds')
 
@@ -133,32 +179,36 @@ class TimeTracker(QWidget):
     def update_table(self):
         self.calendar.dates_with_data.clear()
         self.table.setRowCount(0)  # Clear previous entries
-        with dbm.open('times.db', 'r') as db:
-            for key in db.keys():
-                project_data_bytes = db.get(key)
-                try:
-                    project_data = json.loads(project_data_bytes.decode())
-                    if isinstance(project_data, dict):
-                        self.calendar.dates_with_data.update(project_data.keys())
-                except json.JSONDecodeError:
-                    pass  # Handle unexpected data format
+
+        
+        if Path("times.db").exists():
+            with dbm.open('times.db', 'r') as db:
+                for key in db.keys():
+                    project_data_bytes = db.get(key)
+                    try:
+                        project_data = json.loads(project_data_bytes.decode())
+                        if isinstance(project_data, dict):
+                            self.calendar.dates_with_data.update(project_data.keys())
+                    except json.JSONDecodeError:
+                        pass  # Handle unexpected data format
         self.calendar.updateCells()
 
     def show_time_intervals(self, date):
         date_str = date.toString('yyyy-MM-dd')
         aggregated_intervals = []
 
-        with dbm.open('times.db', 'r') as db:
-            for key in db.keys():
-                project_data_bytes = db.get(key)
-                try:
-                    project_data = json.loads(project_data_bytes.decode())
-                    if isinstance(project_data, dict):
-                        intervals = project_data.get(date_str, [])
-                        for interval in intervals:
-                            aggregated_intervals.append((key.decode(), interval))
-                except json.JSONDecodeError:
-                    pass  # Handle unexpected data format
+        if Path('times.db').exists():
+            with dbm.open('times.db', 'r') as db:
+                for key in db.keys():
+                    project_data_bytes = db.get(key)
+                    try:
+                        project_data = json.loads(project_data_bytes.decode())
+                        if isinstance(project_data, dict):
+                            intervals = project_data.get(date_str, [])
+                            for interval in intervals:
+                                aggregated_intervals.append((key.decode(), interval))
+                    except json.JSONDecodeError:
+                        pass  # Handle unexpected data format
 
         # Sort intervals by start time
         aggregated_intervals.sort(key=lambda x: x[1][0])
@@ -185,6 +235,11 @@ class TimeTracker(QWidget):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_window = QMainWindow()
+    main_window.setStyleSheet("""
+        QMainWindow {
+            background-color: #f0f0f0;
+        }
+    """)
     tracker = TimeTracker()
     main_window.setCentralWidget(tracker)
     main_window.show()
